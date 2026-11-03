@@ -37,6 +37,8 @@ class CliTests(unittest.TestCase):
         self.env.pop('TICKET_BASE_DIR', None)
         self.env['GIT_CONFIG_GLOBAL'] = os.devnull
         self.env['GIT_CONFIG_NOSYSTEM'] = '1'
+        # Match the UTF-8 decoder used for captured CLI output on every OS.
+        self.env['PYTHONIOENCODING'] = 'utf-8'
 
     def cli(self, *args, code=0):
         result = subprocess.run([sys.executable, SCRIPT, *args], cwd=self.cwd, env=self.env, capture_output=True, text=True, encoding='utf-8')
@@ -65,12 +67,12 @@ class CliTests(unittest.TestCase):
         path = self.cwd / '.ticketconfig.yaml'
         for content in ('broken: [', 'version: v0.4\n', 'types: "*"\n'):
             with self.subTest(content=content):
-                path.write_text(content)
+                path.write_text(content, encoding='utf-8')
                 self.env['TICKET_BASE_DIR'] = 'missing-store'
                 documentation = self.cli('config')
                 self.assertEqual(documentation, self.cli('config', '--help'))
                 self.assertEqual(documentation, self.cli('--dir', 'also-missing', 'config'))
-                self.assertEqual(path.read_text(), content)
+                self.assertEqual(path.read_text(encoding='utf-8'), content)
                 self.assertEqual(list(self.cwd.iterdir()), [path])
 
     def test_full_lifecycle_and_machine_shapes(self):
@@ -121,11 +123,11 @@ class CliTests(unittest.TestCase):
                     ['modify', 'bug-a', 'priority=9'], ['create', 'bug', 'New'],
                     ['comment', 'bug-a', 'Note'], ['tag', 'bug-a', 'urgent']]
         for version in versions:
-            config_path.write_text(ticket.dump_yaml({'version': version}))
+            config_path.write_text(ticket.dump_yaml({'version': version}), encoding='utf-8')
             original_config = config_path.read_bytes()
             for command in commands:
                 with self.subTest(version=version, command=command):
-                    result = subprocess.run([sys.executable, SCRIPT, *command], cwd=self.cwd, env=self.env, capture_output=True, text=True)
+                    result = subprocess.run([sys.executable, SCRIPT, *command], cwd=self.cwd, env=self.env, capture_output=True, text=True, encoding='utf-8')
                     self.assertEqual(result.returncode, 1)
                     self.assertIn('no import/migration', result.stderr)
                     self.assertIn(version, result.stderr)
@@ -141,10 +143,10 @@ class CliTests(unittest.TestCase):
         config_path = self.cwd / '.ticketconfig.yaml'
         for content in ('', 'types: "*"\n', 'version: null\n', 'version: 0.5\n', 'version: v0.05\n'):
             with self.subTest(content=content):
-                config_path.write_text(content)
+                config_path.write_text(content, encoding='utf-8')
                 self.cli('ls', code=1)
                 self.cli('create', 'bug', 'New', code=1)
-                self.assertEqual(config_path.read_text(), content)
+                self.assertEqual(config_path.read_text(encoding='utf-8'), content)
         config_path.unlink()
         self.cli('ls', code=1)
         self.cli('create', 'bug', 'New', code=1)
@@ -155,11 +157,11 @@ class CliTests(unittest.TestCase):
         config_path = self.cwd / '.ticketconfig.yaml'
         for version in ('0.5.0', 'v0.5.3', 'v0.5.99+build.007'):
             content = ticket.dump_yaml({'version': version, 'tags': ['urgent']})
-            config_path.write_text(content)
+            config_path.write_text(content, encoding='utf-8')
             self.cli('modify', 'bug-a', '--tag', 'urgent')
             overview = ticket.yaml.load(self.cli('overview', '--output', 'yaml'), Loader=ticket.Loader)
             self.assertEqual(overview['config']['version'], version)
-            self.assertEqual(config_path.read_text(), content)
+            self.assertEqual(config_path.read_text(encoding='utf-8'), content)
 
     def test_unique_prefixes_work_in_all_ticket_commands(self):
         identifier = 'bug-abc1234567890123'
@@ -276,7 +278,7 @@ class CliTests(unittest.TestCase):
         ]
         for command in commands:
             with self.subTest(command=command):
-                result = subprocess.run([sys.executable, SCRIPT, *command], cwd=self.cwd, env=self.env, capture_output=True, text=True)
+                result = subprocess.run([sys.executable, SCRIPT, *command], cwd=self.cwd, env=self.env, capture_output=True, text=True, encoding='utf-8')
                 self.assertEqual(result.returncode, 1)
                 self.assertIn('ambiguous', result.stderr)
                 self.assertIn('bug-abc1111111111111', result.stderr)
@@ -411,7 +413,7 @@ class CliTests(unittest.TestCase):
         for command in ticket.COMMAND_NAMES:
             with self.subTest(command=command):
                 self.cli('modify', 'bug-a', 'status=' + command)
-                result = subprocess.run([sys.executable, SCRIPT, 'ls', command], cwd=self.cwd, env=self.env, capture_output=True, text=True)
+                result = subprocess.run([sys.executable, SCRIPT, 'ls', command], cwd=self.cwd, env=self.env, capture_output=True, text=True, encoding='utf-8')
                 self.assertEqual(result.returncode, 1)
                 self.assertIn('built-in command name', result.stderr)
                 self.assertIn('status=' + command, result.stderr)
@@ -433,7 +435,7 @@ class CliTests(unittest.TestCase):
         (self.cwd / 'configured').mkdir()
         (self.cwd / 'environment').mkdir()
         (self.cwd / 'cli').mkdir()
-        (self.cwd / '.ticketconfig.yaml').write_text('version: v0.5\nbase-directory: configured\n')
+        (self.cwd / '.ticketconfig.yaml').write_text('version: v0.5\nbase-directory: configured\n', encoding='utf-8')
         self.create()
         self.assertTrue((self.cwd / 'configured/bug-a.yaml').exists())
         self.env['TICKET_BASE_DIR'] = 'environment'
@@ -447,8 +449,8 @@ class CliTests(unittest.TestCase):
         store = ticket.Store(self.cwd / 'tickets')
         t = store.load('bug-a')
         t.update(id='wrong', created='bad', updated='bad', relationships={'blocks': ['missing']})
-        store.path('bug-a').write_text(ticket.dump_yaml(ticket.ticket_value(t)))
-        (self.cwd / 'tickets/corrupt.yaml').write_text('bad: [')
+        store.path('bug-a').write_text(ticket.dump_yaml(ticket.ticket_value(t)), encoding='utf-8')
+        (self.cwd / 'tickets/corrupt.yaml').write_text('bad: [', encoding='utf-8')
         issues = json.loads(self.cli('verify', '--output', 'json', code=1))
         self.assertEqual(len(issues), 5)
         rows = json.loads(self.cli('ls', '--output', 'json'))
