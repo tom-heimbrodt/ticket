@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ticket-cli"
+version = "0.5.0"
+description = "Portable YAML ticket CLI"
+requires-python = ">=3.9"
+dependencies = ["PyYAML>=6,<7"]
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+
+[project.scripts]
+ticket = "ticket:main"
+
+[tool.setuptools]
+py-modules = ["ticket"]

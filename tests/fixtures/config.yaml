@@ -1,0 +1,28 @@
+version: v0.5
+types:
+  - feat: # feature request
+      initial-state: new
+      states: ["new", "implemented", "discarded"]
+      relationships:
+        - released-in:
+            reverse: contains
+            target-types: ver
+  - ver: # version
+      initial-state: new
+      states: ["new", "released"]
+  - bug:
+      initial-state: open
+      states: ["open", "fixed", "wontfix"]
+  - issue:
+      initial-state: open
+      states: ["open", "fixed", "wontfix"]
+  - rev: # review workflow: new -> in-progress -> done
+      initial-state: new
+      states:
+        - new: { transitions: [in-progress] }
+        - in-progress: { transitions: [done] }
+        - done
+      relationships:
+        - found:
+            reverse: found-in
+            target-types: ["bug", "issue"]
